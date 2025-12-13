@@ -211,10 +211,7 @@ Create an AI-powered conversational agent that uses your Cortex Search service t
 
 1. Navigate to **AI & ML > Agents** in Snowsight
 2. Click **Create Agent**
-3. Configure the agent:
-   - **Name**: Give your agent a descriptive name (e.g., `document_assistant`)
-   - **Warehouse**: Select a warehouse for query execution
-   - **Model**: Choose an LLM model (e.g., `claude-3-5-sonnet`)
+3. Give your agent a name (e.g., `document_assistant`)
 4. Add your Cortex Search service as a tool:
    - Click **Add Tool** → **Cortex Search**
    - Select your database and schema (`DOCS.PUBLIC`)
@@ -223,13 +220,7 @@ Create an AI-powered conversational agent that uses your Cortex Search service t
 5. Test your agent with sample questions about your documents
 6. Deploy and share with your team
 
-**Example questions to ask your agent:**
-- "What clinical trials are documented?"
-- "Find documents about manufacturing processes"
-- "Summarize the safety protocols"
-- "What documents are available in Swedish?"
-
-The agent will automatically search your document corpus and provide answers with citations to the source documents.
+![Snowflake Intelligence Agent](img/si.png)
 
 ## File Structure
 
