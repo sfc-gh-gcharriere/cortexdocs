@@ -4,7 +4,7 @@ SET SF_SCHEMA = 'PUBLIC';
 SET SF_STAGE = '@DOCS.PUBLIC.STG';
 
 -- Folder filter: set to folder path to process specific folder, or '%' for all documents
--- Examples: 'Clinical/%', 'Regulatory/%', 'Kravspecifikation/%', '%' (all)
+-- Examples: 'Clinical/%', '%' (all)
 SET SF_FOLDER = 'PROJ-17483.pdf';
 
 -- Set context
