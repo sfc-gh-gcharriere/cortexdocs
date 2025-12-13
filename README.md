@@ -1,4 +1,4 @@
-# Galderma Document Search
+# Document Search
 
 Upload and parse PDF documents to Snowflake using AI_PARSE_DOCUMENT, extract metadata using AI_EXTRACT and AI_COMPLETE, and enable semantic search with Cortex Search.
 
@@ -13,7 +13,7 @@ All scripts use the following configuration (edit at the top of each file if nee
 
 | Setting | Value |
 |---------|-------|
-| Database | `GLD` |
+| Database | `DOCS` |
 | Schema | `PUBLIC` |
 | Stage | `STG` |
 
@@ -29,7 +29,7 @@ snow sql -f 1_setup.sql
 
 This will:
 - Enable Cortex cross-region support
-- Create database `GLD`
+- Create database `DOCS`
 - Create schema `PUBLIC`
 - Create stage `STG` with directory enabled and SSE encryption
 
@@ -54,7 +54,7 @@ This will:
 Run the parse commands to extract text from PDFs using AI:
 
 ```bash
-snow sql -f 2_ai_parse.sql --database GLD --schema PUBLIC
+snow sql -f 2_ai_parse.sql --database DOCS --schema PUBLIC
 ```
 
 This will:
@@ -73,7 +73,7 @@ SET SF_FOLDER = '%';           -- Process all documents
 Run the extraction commands to get metadata and summaries:
 
 ```bash
-snow sql -f 3_ai_extract.sql --database GLD --schema PUBLIC
+snow sql -f 3_ai_extract.sql --database DOCS --schema PUBLIC
 ```
 
 This will:
@@ -127,7 +127,7 @@ AI_COMPLETE(
 Run the Cortex Search setup to enable semantic search:
 
 ```bash
-snow sql -f 4_cortex_search.sql --database GLD --schema PUBLIC
+snow sql -f 4_cortex_search.sql --database DOCS --schema PUBLIC
 ```
 
 This will:
@@ -295,6 +295,3 @@ SELECT PARSE_JSON(
 ):results AS search_results;
 ```
 
-## Cost Analysis
-
-See [cost_analysis.md](cost_analysis.md) for detailed cost analysis and benchmark results.

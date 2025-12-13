@@ -1,5 +1,5 @@
 -- Configuration
-SET SF_DATABASE = 'GLD';
+SET SF_DATABASE = 'DOCS';
 SET SF_SCHEMA = 'PUBLIC';
 SET SF_STAGE = 'STG';
 
@@ -17,7 +17,7 @@ USE SCHEMA IDENTIFIER($SF_SCHEMA);
 CREATE STAGE IF NOT EXISTS IDENTIFIER($SF_STAGE)
     DIRECTORY = (ENABLE = TRUE)
     ENCRYPTION = (TYPE = 'SNOWFLAKE_SSE')
-    COMMENT = 'Stage for Galderma document files';
+    COMMENT = 'Stage for document files';
 
 -- =============================================================================
 -- UPLOAD FILES TO STAGE
