@@ -1,0 +1,7 @@
+/.DS_Store
+/5_cost.sql
+/cost_analysis.md
+/data
+/parse_commands.sql
+/questions.txt
+/upload_to_snowflake.sh
