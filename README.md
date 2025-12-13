@@ -7,6 +7,35 @@ Upload and parse PDF documents to Snowflake using AI_PARSE_DOCUMENT, extract met
 - [Snow CLI](https://docs.snowflake.com/en/developer-guide/snowflake-cli-v2/index) installed and configured
 - Snowflake account with Cortex AI features enabled
 
+## Document Processing Playground
+
+For a visual, no-code approach to document processing, use **AI Studio > Document Processing Playground** in Snowsight.
+
+**Features:**
+- Extract structured data from documents using `AI_EXTRACT`
+- Parse and extract content from PDFs using `AI_PARSE_DOCUMENT`
+- Interactive UI to test and preview results before writing SQL
+- Generate SQL code from your playground experiments
+
+**Capabilities:**
+- Ask model questions and normalize answers to consistent formats
+- Retrieve a list of answers from documents
+- Extract tables containing handwritten content
+
+![Document Processing Playground](img/DPP.png)
+
+**Example: Table Extraction**
+
+The model can extract structured tables from documents with impressive accuracy:
+
+| Source Document | Extraction Setup | Extracted Result |
+|-----------------|------------------|------------------|
+| ![Source](img/src.png) | ![Extract Table](img/extract_table.png) | ![Result](img/extract_table_res.png) |
+
+**Access:** Snowsight → AI Studio → Document Processing Playground
+
+This is ideal for prototyping extraction schemas and testing document parsing before implementing the SQL scripts in this repository.
+
 ## Configuration
 
 All scripts use the following configuration (edit at the top of each file if needed):
