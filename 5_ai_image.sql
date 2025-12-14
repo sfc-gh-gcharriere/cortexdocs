@@ -56,6 +56,57 @@ WHERE p.has_images = TRUE
   );
 
 -- =============================================================================
+-- Create table to store image analysis results
+-- =============================================================================
+
+CREATE TABLE IF NOT EXISTS image_analysis (
+    filepath VARCHAR,
+    filename VARCHAR,
+    page_index INT,
+    figure_number VARCHAR,
+    image_type VARCHAR,
+    image_description VARCHAR,
+    data_type VARCHAR,
+    analyzed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP()
+);
+
+-- =============================================================================
+-- Analyze images using AI_COMPLETE (coming soon)
+-- =============================================================================
+-- Uses AI_COMPLETE with claude-3-5-sonnet to analyze images embedded in PDF pages.
+-- Note: AI_COMPLETE on images embedded in PDFs is planned to be supported soon.
+
+-- INSERT INTO image_analysis (filepath, filename, page_index, figure_number, image_type, image_description, data_type)
+-- SELECT 
+--     pf.filepath,
+--     pf.filename,
+--     pf.page_index,
+--     pf.figure_number,
+--     analysis:type::VARCHAR AS image_type,
+--     analysis:description::VARCHAR AS image_description,
+--     analysis:data_type::VARCHAR AS data_type
+-- FROM page_figures pf,
+-- LATERAL (
+--     SELECT PARSE_JSON(
+--         AI_COMPLETE(
+--             'claude-3-5-sonnet',
+--             'Describe what you see in this image. Focus on any charts, graphs, or data visualizations. Respond in JSON only with fields: type (chart/graph/table/image), description, data_type.',
+--             TO_FILE('@STG', pf.filepath),
+--             OBJECT_CONSTRUCT('page', pf.page_index)
+--         )
+--     ) AS analysis
+-- ) img_analysis
+-- WHERE pf.filename LIKE $SF_DOCUMENT
+--   AND pf.image_references IS NOT NULL 
+--   AND pf.image_references != 'None'
+--   AND NOT EXISTS (
+--     SELECT 1 FROM image_analysis ia 
+--     WHERE ia.filepath = pf.filepath 
+--       AND ia.filename = pf.filename 
+--       AND ia.page_index = pf.page_index
+--   );
+
+-- =============================================================================
 -- Verification queries
 -- =============================================================================
 
@@ -77,3 +128,15 @@ SELECT
     COUNT(CASE WHEN figure_number IS NOT NULL AND figure_number != 'None' THEN 1 END) AS pages_with_figure_numbers,
     COUNT(CASE WHEN image_references IS NOT NULL AND image_references != 'None' THEN 1 END) AS pages_with_image_refs
 FROM page_figures;
+
+-- View image analysis results (when available)
+-- SELECT 
+--     filename,
+--     page_index,
+--     figure_number,
+--     image_type,
+--     image_description,
+--     data_type
+-- FROM image_analysis
+-- ORDER BY filename, page_index
+-- LIMIT 20;
