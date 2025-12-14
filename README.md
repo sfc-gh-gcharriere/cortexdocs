@@ -169,7 +169,18 @@ ai_filter(
 - Excludes document headers to avoid false positives
 - Only processes pages not yet analyzed (idempotent)
 
-### 5. Create Cortex Search Service
+### 5. Analyze Images
+
+Run the image analysis commands:
+
+```bash
+snow sql -f 5_ai_image.sql --database GLD --schema PUBLIC
+```
+
+This will:
+- Analyze images detected in documents (coming soon)
+
+### 6. Create Cortex Search Service
 
 Run the Cortex Search setup to enable semantic search:
 
@@ -219,7 +230,7 @@ TARGET_LAG = '1 hour'
 - `header_1`, `header_2` - Section headers
 - `page_index` - Page location
 
-### 6. Create Snowflake Intelligence Agent
+### 7. Create Snowflake Intelligence Agent
 
 Create an AI-powered conversational agent that uses your Cortex Search service to answer questions about your documents.
 
@@ -249,7 +260,8 @@ Create an AI-powered conversational agent that uses your Cortex Search service t
 ├── 2_ai_parse.sql            # Document parsing commands
 ├── 3_ai_extract.sql          # Metadata extraction and summaries
 ├── 4_cortex_search.sql       # Chunking and Cortex Search service
-├── 5_cost.sql                # Cost analysis queries
+├── 5_ai_image.sql            # Image detection per page
+├── 6_cost.sql                # Cost analysis queries
 ├── upload_to_snowflake.sh    # Upload script for PDF files
 └── data/                     # PDF files to upload (not tracked in git)
 ```
