@@ -36,7 +36,7 @@ parsed AS (
         SPLIT_PART(f.filepath, '/', -1) AS filename,
         AI_PARSE_DOCUMENT(
             TO_FILE($SF_STAGE, f.filepath),
-            { 'mode': 'LAYOUT', 'page_split': true }
+            { 'mode': 'OCR', 'page_split': true }
         ) AS parsed_doc
     FROM files f
 )

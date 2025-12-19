@@ -197,7 +197,7 @@ AI_COMPLETE(
 ├── README.md                 # This file
 ├── all_in_one_ocr.sql        # Complete pipeline with OCR and signatures
 ├── 1_setup.sql               # Database, schema, stage creation
-├── 2_ai_parse.sql            # Document parsing (LAYOUT mode)
+├── 2_ai_parse.sql            # Document parsing (OCR mode)
 ├── 3_ai_extract.sql          # Metadata extraction and summaries
 ├── 4_cortex_search.sql       # Chunking and Cortex Search service
 ├── 5_ai_signatures.sql       # Handwritten signature extraction
