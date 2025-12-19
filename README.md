@@ -72,13 +72,7 @@ snow sql -f 2_ai_parse.sql --database DOCS --schema PUBLIC
 snow sql -f 3_ai_extract.sql --database DOCS --schema PUBLIC
 ```
 
-### 5. Extract Handwritten Signatures
-
-```bash
-snow sql -f 5_ai_signatures.sql --database DOCS --schema PUBLIC
-```
-
-### 6. Create Cortex Search Service
+### 5. Create Cortex Search Service
 
 ```bash
 snow sql -f 4_cortex_search.sql --database DOCS --schema PUBLIC
@@ -198,9 +192,8 @@ AI_COMPLETE(
 ├── all_in_one_ocr.sql        # Complete pipeline with OCR and signatures
 ├── 1_setup.sql               # Database, schema, stage creation
 ├── 2_ai_parse.sql            # Document parsing (OCR mode)
-├── 3_ai_extract.sql          # Metadata extraction and summaries
+├── 3_ai_extract.sql          # Metadata, summaries, and signature extraction
 ├── 4_cortex_search.sql       # Chunking and Cortex Search service
-├── 5_ai_signatures.sql       # Handwritten signature extraction
 ├── upload_to_snowflake.sh    # Upload script for PDF files
 └── data/                     # PDF files to upload (not tracked in git)
 ```
