@@ -20,9 +20,6 @@ ADD COLUMN IF NOT EXISTS language VARCHAR;
 ALTER TABLE parsed_document
 ADD COLUMN IF NOT EXISTS summary VARCHAR;
 
-ALTER TABLE parsed_document
-ADD COLUMN IF NOT EXISTS has_images BOOLEAN;
-
 -- =============================================================================
 -- STEP 1: Extract metadata (title, print_date, language) using AI_EXTRACT
 -- =============================================================================
