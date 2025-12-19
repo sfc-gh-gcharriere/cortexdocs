@@ -138,17 +138,7 @@ WHERE p.filepath = src.filepath
   AND p.summary IS NULL;
 
 -- =============================================================================
--- STEP 3: Detect images on each page using AI_FILTER
--- =============================================================================
-
-UPDATE parsed_document
-SET has_images = ai_filter(
-    prompt('Excluding the document header, does the content include any images that feature a caption or figure number?: {0}', page_content)
-)
-WHERE has_images IS NULL;
-
--- =============================================================================
--- STEP 4: Propagate metadata from page 0 to all other pages
+-- STEP 3: Propagate metadata from page 0 to all other pages
 -- =============================================================================
 
 UPDATE parsed_document p
@@ -178,8 +168,7 @@ SELECT
     title,
     print_date,
     language,
-    LEFT(summary, 200) AS summary_preview,
-    has_images
+    LEFT(summary, 200) AS summary_preview
 FROM parsed_document 
 WHERE page_index = 0
 ORDER BY filepath 
@@ -194,29 +183,16 @@ WHERE page_index = 0
 GROUP BY language
 ORDER BY document_count DESC;
 
--- Image statistics per document
-SELECT 
-    filename,
-    MAX(page_count) AS page_count,
-    COUNT(CASE WHEN has_images = TRUE THEN 1 END) AS pages_with_images,
-    ROUND(COUNT(CASE WHEN has_images = TRUE THEN 1 END) * 100.0 / MAX(page_count), 1) AS image_percentage
-FROM parsed_document
-GROUP BY filepath, filename
-ORDER BY pages_with_images DESC
-LIMIT 20;
-
 -- Documents with missing metadata
 SELECT 
     filename,
     CASE WHEN title IS NULL OR title = '' THEN 'Missing' ELSE 'OK' END AS title_status,
     CASE WHEN print_date IS NULL OR print_date = '' THEN 'Missing' ELSE 'OK' END AS date_status,
     CASE WHEN language IS NULL OR language = '' THEN 'Missing' ELSE 'OK' END AS language_status,
-    CASE WHEN summary IS NULL OR summary = '' THEN 'Missing' ELSE 'OK' END AS summary_status,
-    CASE WHEN has_images IS NULL THEN 'Missing' ELSE 'OK' END AS has_images_status
+    CASE WHEN summary IS NULL OR summary = '' THEN 'Missing' ELSE 'OK' END AS summary_status
 FROM parsed_document
 WHERE page_index = 0
   AND (title IS NULL OR title = '' 
        OR print_date IS NULL OR print_date = ''
        OR language IS NULL OR language = ''
-       OR summary IS NULL OR summary = ''
-       OR has_images IS NULL);
+       OR summary IS NULL OR summary = '');

@@ -106,10 +106,9 @@ snow sql -f 3_ai_extract.sql --database DOCS --schema PUBLIC
 ```
 
 This will:
-- Add `title`, `print_date`, `language`, `summary`, `has_images` columns to `parsed_document`
+- Add `title`, `print_date`, `language`, `summary` columns to `parsed_document`
 - Extract metadata using `AI_EXTRACT` with `TO_FILE` (accesses PDF metadata for dates)
 - Generate summaries using `AI_COMPLETE` with Claude 3.5 Sonnet
-- Detect images on each page using `AI_FILTER`
 - Propagate metadata from page 0 to all pages of each document
 
 #### AI_EXTRACT
@@ -152,35 +151,7 @@ AI_COMPLETE(
 - Combines first 10 pages content for better context (8000 chars max)
 - Only processes documents without summaries (idempotent)
 
-#### AI_FILTER (Image Detection)
-
-Uses Snowflake Cortex `AI_FILTER` function to detect whether each page contains images with captions or figure numbers:
-
-```sql
-ai_filter(
-    prompt('Excluding the document header, does the content include any images that feature a caption or figure number?: {0}', page_content)
-)
-```
-
-**Key features:**
-- Uses `prompt()` function to inject page content into the AI query
-- Returns `TRUE` if the page contains images with captions/figure numbers
-- Processes each page individually (not just page 0)
-- Excludes document headers to avoid false positives
-- Only processes pages not yet analyzed (idempotent)
-
-### 5. Analyze Images
-
-Run the image analysis commands:
-
-```bash
-snow sql -f 5_ai_image.sql --database GLD --schema PUBLIC
-```
-
-This will:
-- Analyze images detected in documents (coming soon)
-
-### 6. Create Cortex Search Service
+### 5. Create Cortex Search Service
 
 Run the Cortex Search setup to enable semantic search:
 
@@ -230,7 +201,7 @@ TARGET_LAG = '1 hour'
 - `header_1`, `header_2` - Section headers
 - `page_index` - Page location
 
-### 7. Create Snowflake Intelligence Agent
+### 6. Create Snowflake Intelligence Agent
 
 Create an AI-powered conversational agent that uses your Cortex Search service to answer questions about your documents.
 
@@ -260,8 +231,7 @@ Create an AI-powered conversational agent that uses your Cortex Search service t
 ├── 2_ai_parse.sql            # Document parsing commands
 ├── 3_ai_extract.sql          # Metadata extraction and summaries
 ├── 4_cortex_search.sql       # Chunking and Cortex Search service
-├── 5_ai_image.sql            # Image detection per page
-├── 6_cost.sql                # Cost analysis queries
+├── 5_cost.sql                # Cost analysis queries
 ├── upload_to_snowflake.sh    # Upload script for PDF files
 └── data/                     # PDF files to upload (not tracked in git)
 ```
@@ -282,7 +252,6 @@ Create an AI-powered conversational agent that uses your Cortex Search service t
 | `print_date` | VARCHAR | Document date (from AI_EXTRACT) |
 | `language` | VARCHAR | Document language (from AI_EXTRACT) |
 | `summary` | VARCHAR | Document summary (from AI_COMPLETE) |
-| `has_images` | BOOLEAN | Whether page contains images with captions (from AI_FILTER) |
 
 ### doc_chunks
 
