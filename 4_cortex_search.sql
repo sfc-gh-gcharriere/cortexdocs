@@ -8,11 +8,27 @@ USE DATABASE IDENTIFIER($SF_DATABASE);
 USE SCHEMA IDENTIFIER($SF_SCHEMA);
 
 -- =============================================================================
--- STEP 1: Create chunked documents table
+-- STEP 1: Create helper table for signature text
 -- =============================================================================
 
--- Create table with document chunks for better semantic search
--- Uses SPLIT_TEXT_MARKDOWN_HEADER to split content into chunks with headers
+CREATE OR REPLACE TEMPORARY TABLE temp_signature_text AS
+SELECT 
+    filepath,
+    filename,
+    LISTAGG('Signature: ' || TRIM(SPLIT_PART(s.value::VARCHAR, '|', 1)) 
+            || ' | Title: ' || TRIM(SPLIT_PART(s.value::VARCHAR, '|', 2))
+            || ' | Date: ' || TRIM(SPLIT_PART(s.value::VARCHAR, '|', 3)), '\n') AS signature_text
+FROM parsed_document pd,
+LATERAL FLATTEN(input => pd.hand_signatures) s
+WHERE pd.page_index = 0
+  AND pd.hand_signatures IS NOT NULL
+  AND ARRAY_SIZE(pd.hand_signatures) > 0
+GROUP BY filepath, filename;
+
+-- =============================================================================
+-- STEP 2: Create chunked documents table with embedded signatures
+-- =============================================================================
+
 CREATE OR REPLACE TABLE doc_chunks AS
 SELECT
     pd.filepath,
@@ -23,6 +39,7 @@ SELECT
     pd.print_date,
     pd.language,
     pd.summary,
+    pd.hand_signatures,
     BUILD_SCOPED_FILE_URL($SF_STAGE, pd.filepath) AS file_url,
     (
         pd.filepath || ' - Page ' || pd.page_index || ':\n'
@@ -30,11 +47,18 @@ SELECT
         || COALESCE('Header 1: ' || c.value['headers']['header_1'] || '\n', '')
         || COALESCE('Header 2: ' || c.value['headers']['header_2'] || '\n', '')
         || c.value['chunk']
+        || CASE 
+            WHEN pd.page_index = 0 AND sig.signature_text IS NOT NULL AND sig.signature_text != '' 
+            THEN '\n\n--- Handwritten Signatures ---\n' || sig.signature_text 
+            ELSE '' 
+           END
     ) AS chunk,
     c.value['headers']['header_1']::VARCHAR AS header_1,
     c.value['headers']['header_2']::VARCHAR AS header_2,
     c.index AS chunk_index
-FROM parsed_document pd,
+FROM parsed_document pd
+LEFT JOIN temp_signature_text sig 
+    ON pd.filepath = sig.filepath AND pd.filename = sig.filename,
 LATERAL FLATTEN(
     SNOWFLAKE.CORTEX.SPLIT_TEXT_MARKDOWN_HEADER(
         pd.page_content,
@@ -48,6 +72,7 @@ LATERAL FLATTEN(
 SELECT 
     COUNT(*) AS total_chunks,
     COUNT(DISTINCT filepath) AS total_documents,
+    SUM(CASE WHEN chunk LIKE '%Handwritten Signatures%' THEN 1 ELSE 0 END) AS chunks_with_signatures,
     AVG(LENGTH(chunk)) AS avg_chunk_length
 FROM doc_chunks;
 
@@ -63,10 +88,9 @@ FROM doc_chunks
 LIMIT 10;
 
 -- =============================================================================
--- STEP 2: Create Cortex Search Service on chunked documents
+-- STEP 3: Create Cortex Search Service on chunked documents
 -- =============================================================================
 
--- Create Cortex Search service for semantic search over document chunks
 CREATE OR REPLACE CORTEX SEARCH SERVICE document_search
 ON chunk
 ATTRIBUTES title, filename, filepath, language, print_date, summary, header_1, header_2, page_index

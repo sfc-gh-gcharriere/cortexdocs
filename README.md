@@ -66,17 +66,21 @@ Place PDFs in `./data` directory and run:
 snow sql -f 2_ai_parse.sql --database DOCS --schema PUBLIC
 ```
 
-### 4. Extract Metadata and Summaries
+### 4. Extract Metadata, Summaries, and Signatures
 
 ```bash
 snow sql -f 3_ai_extract.sql --database DOCS --schema PUBLIC
 ```
+
+This extracts title, date, language, generates AI summaries, and extracts handwritten signatures.
 
 ### 5. Create Cortex Search Service
 
 ```bash
 snow sql -f 4_cortex_search.sql --database DOCS --schema PUBLIC
 ```
+
+Creates searchable chunks with embedded signature information and the Cortex Search service.
 
 ---
 

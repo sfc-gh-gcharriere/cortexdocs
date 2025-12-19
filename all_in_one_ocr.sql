@@ -117,6 +117,7 @@ FROM (
     WHERE page_index = 0
       AND title IS NULL
       AND page_count <= 125  -- TO_FILE limit
+      AND filepath LIKE $SF_FOLDER
 ) src,
 LATERAL (
     SELECT 
@@ -155,6 +156,7 @@ FROM (
                 WITHIN GROUP (ORDER BY page_index) AS first_10_pages_content
         FROM parsed_document_ocr
         WHERE page_index < 10
+          AND filepath LIKE $SF_FOLDER
         GROUP BY filepath, filename
         HAVING MAX(CASE WHEN page_index = 0 THEN title END) IS NULL  -- Only unprocessed docs
            AND MAX(page_count) > 125  -- Large documents only
@@ -196,6 +198,7 @@ FROM (
                 WITHIN GROUP (ORDER BY page_index) AS combined_content
         FROM parsed_document_ocr
         WHERE page_index < 10
+          AND filepath LIKE $SF_FOLDER
         GROUP BY filepath, filename
         HAVING MAX(CASE WHEN page_index = 0 THEN summary END) IS NULL  -- Only docs without summary
     )
@@ -315,6 +318,7 @@ FROM (
     FROM parsed_document_ocr
     WHERE page_index = 0
       AND title IS NOT NULL
+      AND filepath LIKE $SF_FOLDER
 ) src
 WHERE p.filepath = src.filepath
   AND p.filename = src.filename
@@ -330,6 +334,7 @@ SELECT
     LEFT(summary, 200) AS summary_preview
 FROM parsed_document_ocr 
 WHERE page_index = 0
+  AND filepath LIKE $SF_FOLDER
 ORDER BY filepath 
 LIMIT 20;
 
