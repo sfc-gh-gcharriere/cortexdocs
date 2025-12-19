@@ -1,259 +1,302 @@
-# Document Search
+# Document Search with Signature Extraction
 
-Upload and parse PDF documents to Snowflake using AI_PARSE_DOCUMENT, extract metadata using AI_EXTRACT and AI_COMPLETE, and enable semantic search with Cortex Search.
+Upload and parse PDF documents to Snowflake using AI_PARSE_DOCUMENT, extract metadata and **handwritten signatures** using AI_EXTRACT, generate summaries with AI_COMPLETE, and enable semantic search with Cortex Search.
+
+## Features
+
+- **Document Parsing**: Extract text from PDFs using OCR or Layout mode
+- **Metadata Extraction**: Automatically extract title, date, and language
+- **Handwritten Signature Extraction**: Detect and extract signer names, titles, and dates
+- **AI Summaries**: Generate concise document summaries using Claude 3.5 Sonnet
+- **Semantic Search**: Search documents by meaning, not just keywords
+- **Signature Search**: Find documents signed by specific people or on specific dates
 
 ## Prerequisites
 
 - [Snow CLI](https://docs.snowflake.com/en/developer-guide/snowflake-cli-v2/index) installed and configured
 - Snowflake account with Cortex AI features enabled
 
+## Quick Start: All-in-One OCR Script
+
+For the fastest setup with signature extraction, use the all-in-one script:
+
+```bash
+snow sql -f all_in_one_ocr.sql
+```
+
+This single script will:
+1. Parse documents using OCR mode
+2. Extract metadata (title, date, language)
+3. Generate AI summaries
+4. **Extract handwritten signatures** (Name | Title | Date)
+5. Clean and validate signature data
+6. Create searchable chunks with embedded signatures
+7. Create Cortex Search service for semantic search
+
+**Configuration** (edit at the top of `all_in_one_ocr.sql`):
+```sql
+SET SF_DATABASE = 'GLD';
+SET SF_SCHEMA = 'PUBLIC';
+SET SF_STAGE = '@GLD.PUBLIC.STG';
+SET SF_FOLDER = '%';  -- Use 'folder/%' to limit scope
+```
+
+---
+
+## Step-by-Step Approach
+
+If you prefer running each step separately:
+
+### 1. Create Database, Schema, and Stage
+
+```bash
+snow sql -f 1_setup.sql
+```
+
+### 2. Upload PDF Files
+
+Place PDFs in `./data` directory and run:
+
+```bash
+./upload_to_snowflake.sh
+```
+
+### 3. Parse Documents
+
+```bash
+snow sql -f 2_ai_parse.sql --database DOCS --schema PUBLIC
+```
+
+### 4. Extract Metadata and Summaries
+
+```bash
+snow sql -f 3_ai_extract.sql --database DOCS --schema PUBLIC
+```
+
+### 5. Extract Handwritten Signatures
+
+```bash
+snow sql -f 5_ai_signatures.sql --database GLD --schema PUBLIC
+```
+
+### 6. Create Cortex Search Service
+
+```bash
+snow sql -f 4_cortex_search.sql --database DOCS --schema PUBLIC
+```
+
+---
+
 ## Document Processing Playground
 
-For a visual, no-code approach to document processing, use **AI Studio > Document Processing Playground** in Snowsight.
-
-**Features:**
-- Extract structured data from documents using `AI_EXTRACT`
-- Parse and extract content from PDFs using `AI_PARSE_DOCUMENT`
-- Interactive UI to test and preview results before writing SQL
-- Generate SQL code from your playground experiments
+For a visual, no-code approach, use **AI Studio > Document Processing Playground** in Snowsight.
 
 **Capabilities:**
-- Ask model questions and normalize answers to consistent formats
-- Retrieve a list of answers from documents
+- Extract structured data from documents using `AI_EXTRACT`
+- Parse and extract content from PDFs using `AI_PARSE_DOCUMENT`
+- Interactive UI to test and preview results
 - Extract tables containing handwritten content
 
 ![Document Processing Playground](img/DPP.png)
 
 **Example: Table Extraction**
 
-The model can extract structured tables from documents with impressive accuracy:
+| Extraction Setup | Extracted Result |
+|------------------|------------------|
+| ![Extract Table](img/extract_table.png) | ![Result](img/extract_table_res.png) |
 
-| Source Document | Extraction Setup | Extracted Result |
-|-----------------|------------------|------------------|
-| ![Source](img/src.png) | ![Extract Table](img/extract_table.png) | ![Result](img/extract_table_res.png) |
+---
 
-**Access:** Snowsight → AI Studio → Document Processing Playground
+## Handwritten Signature Extraction
 
-This is ideal for prototyping extraction schemas and testing document parsing before implementing the SQL scripts in this repository.
+### How It Works
 
-## Configuration
+The signature extraction uses `AI_EXTRACT` with a structured JSON schema to identify handwritten signatures throughout documents (excluding dedicated Signatures Pages):
 
-All scripts use the following configuration (edit at the top of each file if needed):
-
-| Setting | Value |
-|---------|-------|
-| Database | `DOCS` |
-| Schema | `PUBLIC` |
-| Stage | `STG` |
-
-## Setup
-
-### 1. Create Database, Schema, and Stage
-
-Run the setup SQL to create all Snowflake objects:
-
-```bash
-snow sql -f 1_setup.sql
-```
-
-This will:
-- Enable Cortex cross-region support
-- Create database `DOCS`
-- Create schema `PUBLIC`
-- Create stage `STG` with directory enabled and SSE encryption
-
-### 2. Upload PDF Files
-
-Place your PDF files in the `./data` directory (subdirectories are supported).
-
-Run the upload script:
-
-```bash
-./upload_to_snowflake.sh
-```
-
-This will:
-- Scan `./data` for all PDF files
-- Upload files to the stage preserving directory structure
-- Refresh stage metadata
-- Display upload summary
-
-### 3. Parse Documents
-
-Run the parse commands to extract text from PDFs using AI:
-
-```bash
-snow sql -f 2_ai_parse.sql --database DOCS --schema PUBLIC
-```
-
-This will:
-- Create the `parsed_document` table
-- Parse PDFs using `AI_PARSE_DOCUMENT` with layout mode and page splitting
-- Store extracted content per page
-
-**Configuration**: Edit `SF_FOLDER` variable at the top to process specific folders:
 ```sql
-SET SF_FOLDER = 'Clinical/%';  -- Process only Clinical folder
-SET SF_FOLDER = '%';           -- Process all documents
+AI_EXTRACT(
+    file => TO_FILE('@STAGE', filepath),
+    responseFormat => PARSE_JSON('{
+        "schema": {
+            "type": "object",
+            "properties": {
+                "hand_signatures": {
+                    "description": "List handwritten signatures on all pages except the dedicated Signatures Pages. For each, Return: [Name] | [Short Title] | [Date].",
+                    "type": "array",
+                    "items": {"type": "string"}
+                }
+            }
+        }
+    }')
+)
 ```
 
-### 4. Extract Metadata and Summaries
+### Signature Data Cleaning
 
-Run the extraction commands to get metadata and summaries:
+Extracted signatures are automatically cleaned to ensure quality:
+- **Valid signatures** must have a real name AND a real date
+- Entries with `None` for name or date are filtered out
+- Documents with no valid signatures have `hand_signatures` set to `NULL`
+- Title is optional (signature is kept if name and date are valid)
 
-```bash
-snow sql -f 3_ai_extract.sql --database DOCS --schema PUBLIC
+### Signature View
+
+Query extracted signatures using the `v_hand_signatures` view:
+
+```sql
+SELECT * FROM v_hand_signatures;
 ```
 
-This will:
-- Add `title`, `print_date`, `language`, `summary` columns to `parsed_document`
-- Extract metadata using `AI_EXTRACT` with `TO_FILE` (accesses PDF metadata for dates)
-- Generate summaries using `AI_COMPLETE` with Claude 3.5 Sonnet
-- Propagate metadata from page 0 to all pages of each document
+| Column | Description |
+|--------|-------------|
+| `filepath` | Document path |
+| `filename` | Document name |
+| `title` | Document title |
+| `print_date` | Document date |
+| `signature_raw` | Raw extracted string |
+| `signer_name` | Extracted signer name |
+| `signer_title` | Extracted signer title |
+| `signature_date` | Extracted signature date |
 
-#### AI_EXTRACT
+### Example Signature Queries
 
-Uses Snowflake Cortex `AI_EXTRACT` function to extract structured metadata from documents:
+```sql
+-- Find all signatures by a specific person
+SELECT * FROM v_hand_signatures WHERE signer_name ILIKE '%Smith%';
+
+-- Find documents signed in 2024
+SELECT * FROM v_hand_signatures WHERE signature_date LIKE '%2024%';
+
+-- List all documents with handwritten signatures
+SELECT DISTINCT filename, title FROM v_hand_signatures;
+
+-- Count signatures per document
+SELECT filename, COUNT(*) AS signature_count
+FROM v_hand_signatures
+GROUP BY filename
+ORDER BY signature_count DESC;
+```
+
+---
+
+## Cortex Search with Signatures
+
+The `doc_chunks_ocr_signature` table embeds signature information directly into searchable chunks, enabling semantic search for signed documents:
+
+```sql
+-- Search for documents signed by a specific person
+SELECT PARSE_JSON(
+    SNOWFLAKE.CORTEX.SEARCH_PREVIEW(
+        'document_search_ocr_signature',
+        '{
+            "query": "signed by Anna Nilsson",
+            "columns": ["filepath", "filename", "title", "chunk"],
+            "limit": 10
+        }'
+    )
+):results AS search_results;
+
+-- Search for approvals or sign-offs
+SELECT PARSE_JSON(
+    SNOWFLAKE.CORTEX.SEARCH_PREVIEW(
+        'document_search_ocr_signature',
+        '{
+            "query": "approval signature medical director",
+            "columns": ["filepath", "filename", "title", "chunk"],
+            "limit": 10
+        }'
+    )
+):results AS search_results;
+```
+
+---
+
+## AI Functions Used
+
+### AI_PARSE_DOCUMENT
+
+Extracts text from PDFs with two modes:
+
+| Mode | Best For | Description |
+|------|----------|-------------|
+| **LAYOUT** | Complex documents | Optimized for tables, forms, structured layouts |
+| **OCR** | Text-heavy documents | Fast, high-quality text extraction from manuals, contracts, policies |
+
+```sql
+AI_PARSE_DOCUMENT(
+    TO_FILE('@STAGE', filepath),
+    { 'mode': 'OCR', 'page_split': true }
+)
+```
+
+### AI_EXTRACT
+
+Extracts structured data from documents:
 
 ```sql
 AI_EXTRACT(
     TO_FILE('@STAGE', filepath),
     OBJECT_CONSTRUCT(
-        'title', 'The main title or subject of this document...',
-        'print_date', 'Any date found in the document...',
-        'language', 'The primary language...'
+        'title', 'Document title...',
+        'print_date', 'Document date...',
+        'language', 'Primary language...'
     )
 )
 ```
 
-**Key features:**
-- Uses `TO_FILE` to access original PDF (better date extraction from PDF metadata)
-- Documents ≤125 pages: Uses `TO_FILE` directly
-- Documents >125 pages: Falls back to parsed content (first 10 pages)
-- Only processes documents not yet extracted (idempotent)
+**Limitations:**
+- `TO_FILE` supports documents up to 125 pages
+- Larger documents fall back to parsed content extraction
 
-#### AI_COMPLETE
+### AI_COMPLETE
 
-Uses Snowflake Cortex `AI_COMPLETE` function to generate document summaries:
+Generates summaries using Claude 3.5 Sonnet:
 
 ```sql
 AI_COMPLETE(
     'claude-3-5-sonnet',
-    CONCAT(
-        'Provide a brief 2-3 sentence summary...',
-        LEFT(combined_content, 8000)
-    )
+    CONCAT('Provide a brief 2-3 sentence summary...', content)
 )
 ```
 
-**Key features:**
-- Uses Claude 3.5 Sonnet model for high-quality summaries
-- Combines first 10 pages content for better context (8000 chars max)
-- Only processes documents without summaries (idempotent)
-
-### 5. Create Cortex Search Service
-
-Run the Cortex Search setup to enable semantic search:
-
-```bash
-snow sql -f 4_cortex_search.sql --database DOCS --schema PUBLIC
-```
-
-This will:
-- Create `doc_chunks` table with chunked document content
-- Create `document_search` Cortex Search service for semantic search
-
-#### Document Chunking
-
-Uses `SPLIT_TEXT_MARKDOWN_HEADER` to create searchable chunks:
-
-```sql
-SNOWFLAKE.CORTEX.SPLIT_TEXT_MARKDOWN_HEADER(
-    page_content,
-    OBJECT_CONSTRUCT('#', 'header_1', '##', 'header_2'),
-    2000,  -- chunk size (characters)
-    300    -- overlap (characters)
-)
-```
-
-**Key features:**
-- Splits content into ~2000 character chunks with 300 char overlap
-- Preserves markdown headers (`header_1`, `header_2`) for context
-- Includes document metadata (filepath, title, page) in each chunk
-- Creates scoped file URLs for document access
-
-#### Cortex Search Service
-
-Creates a semantic search service on the chunked documents:
-
-```sql
-CREATE CORTEX SEARCH SERVICE document_search
-ON chunk
-ATTRIBUTES title, filename, filepath, language, print_date, summary, header_1, header_2, page_index
-WAREHOUSE = COMPUTE_WH
-TARGET_LAG = '1 hour'
-```
-
-**Searchable attributes:**
-- `chunk` - Main searchable content
-- `title`, `filename`, `filepath` - Document identifiers
-- `language`, `print_date`, `summary` - Metadata
-- `header_1`, `header_2` - Section headers
-- `page_index` - Page location
-
-### 6. Create Snowflake Intelligence Agent
-
-Create an AI-powered conversational agent that uses your Cortex Search service to answer questions about your documents.
-
-**Access:** Snowsight → AI & ML → Agents
-
-**Steps to create an agent:**
-
-1. Navigate to **AI & ML > Agents** in Snowsight
-2. Click **Create Agent**
-3. Give your agent a name (e.g., `document_assistant`)
-4. Add your Cortex Search service as a tool:
-   - Click **Add Tool** → **Cortex Search**
-   - Select your database and schema (`DOCS.PUBLIC`)
-   - Choose the `document_search` service
-   - Configure which columns to return in responses
-5. Test your agent with sample questions about your documents
-6. Deploy and share with your team
-
-![Snowflake Intelligence Agent](img/si.png)
+---
 
 ## File Structure
 
 ```
 .
 ├── README.md                 # This file
+├── all_in_one_ocr.sql        # Complete pipeline with OCR and signatures
 ├── 1_setup.sql               # Database, schema, stage creation
-├── 2_ai_parse.sql            # Document parsing commands
+├── 2_ai_parse.sql            # Document parsing (LAYOUT mode)
 ├── 3_ai_extract.sql          # Metadata extraction and summaries
 ├── 4_cortex_search.sql       # Chunking and Cortex Search service
-├── 5_cost.sql                # Cost analysis queries
+├── 5_ai_signatures.sql       # Handwritten signature extraction
 ├── upload_to_snowflake.sh    # Upload script for PDF files
 └── data/                     # PDF files to upload (not tracked in git)
 ```
 
+---
+
 ## Table Schemas
 
-### parsed_document
+### parsed_document_ocr
 
 | Column | Type | Description |
 |--------|------|-------------|
-| `filepath` | VARCHAR | Full relative path (e.g., `Clinical/Studies/file.pdf`) |
+| `filepath` | VARCHAR | Full relative path |
 | `filename` | VARCHAR | Just the filename |
 | `page_count` | INT | Total pages in document |
 | `page_index` | INT | Current page index (0-based) |
-| `page_content` | VARCHAR | Page content text |
-| `parsed_at` | TIMESTAMP | When the document was parsed |
+| `page_content` | VARCHAR | Extracted page text |
 | `title` | VARCHAR | Document title (from AI_EXTRACT) |
 | `print_date` | VARCHAR | Document date (from AI_EXTRACT) |
 | `language` | VARCHAR | Document language (from AI_EXTRACT) |
 | `summary` | VARCHAR | Document summary (from AI_COMPLETE) |
+| `hand_signatures` | VARIANT | Array of signatures: `["Name \| Title \| Date", ...]` |
+| `parsed_at` | TIMESTAMP | When the document was parsed |
 
-### doc_chunks
+### doc_chunks_ocr_signature
 
 | Column | Type | Description |
 |--------|------|-------------|
@@ -265,54 +308,109 @@ Create an AI-powered conversational agent that uses your Cortex Search service t
 | `print_date` | VARCHAR | Document date |
 | `language` | VARCHAR | Document language |
 | `summary` | VARCHAR | Document summary |
-| `file_url` | VARCHAR | Scoped URL to original file |
-| `chunk` | VARCHAR | Searchable chunk with context |
-| `header_1` | VARCHAR | Level 1 markdown header |
-| `header_2` | VARCHAR | Level 2 markdown header |
+| `hand_signatures` | VARIANT | Array of signatures |
+| `presigned_url` | VARCHAR | Presigned URL to access document |
+| `chunk` | VARCHAR | Searchable chunk with embedded signatures |
 | `chunk_index` | INT | Chunk index within page |
+
+### v_hand_signatures (View)
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `filepath` | VARCHAR | Document path |
+| `filename` | VARCHAR | Document name |
+| `title` | VARCHAR | Document title |
+| `print_date` | VARCHAR | Document date |
+| `signature_raw` | VARCHAR | Raw signature string |
+| `signer_name` | VARCHAR | Extracted signer name |
+| `signer_title` | VARCHAR | Extracted signer title |
+| `signature_date` | VARCHAR | Extracted signature date |
+
+---
+
+## Snowflake Intelligence Agent
+
+Create an AI-powered conversational agent that uses your Cortex Search service to answer questions about your documents.
+
+**Access:** Snowsight → AI & ML → Agents
+
+**Steps:**
+1. Navigate to **AI & ML > Agents** in Snowsight
+2. Click **Create Agent**
+3. Add your Cortex Search service as a tool:
+   - Select `document_search_ocr_signature` service
+   - Configure which columns to return
+4. Test with questions like:
+   - "Who signed the clinical trial protocol?"
+   - "Find documents approved by the medical director"
+   - "What documents were signed in December 2024?"
+
+![Snowflake Intelligence Agent](img/si.png)
+
+---
 
 ## Example Queries
 
-### Basic SQL Queries
+### Document Metadata
 
 ```sql
--- Count files in stage
-SELECT COUNT(*) FROM DIRECTORY(@STG);
-
 -- List all parsed documents with metadata
-SELECT DISTINCT filename, title, print_date, language, page_count 
-FROM parsed_document 
-WHERE page_index = 0;
-
--- Search by title
-SELECT filename, title, LEFT(summary, 200) AS summary_preview
-FROM parsed_document 
+SELECT DISTINCT 
+    filename, 
+    title, 
+    print_date, 
+    language, 
+    page_count,
+    CASE WHEN hand_signatures IS NOT NULL THEN 'Yes' ELSE 'No' END AS has_signatures
+FROM parsed_document_ocr 
 WHERE page_index = 0
-  AND title ILIKE '%protocol%';
-
--- Search content
-SELECT filename, page_index, page_content 
-FROM parsed_document 
-WHERE page_content ILIKE '%search term%';
+ORDER BY filename;
 
 -- Documents by language
 SELECT language, COUNT(DISTINCT filename) AS document_count
-FROM parsed_document
+FROM parsed_document_ocr
 WHERE page_index = 0
 GROUP BY language
 ORDER BY document_count DESC;
 ```
 
-### Cortex Search Queries (Semantic Search)
+### Signature Analytics
 
 ```sql
--- Basic semantic search
+-- Top signers across all documents
+SELECT signer_name, COUNT(*) AS signature_count
+FROM v_hand_signatures
+GROUP BY signer_name
+ORDER BY signature_count DESC
+LIMIT 20;
+
+-- Signatures by month
+SELECT 
+    LEFT(signature_date, 7) AS month,
+    COUNT(*) AS signatures
+FROM v_hand_signatures
+WHERE signature_date IS NOT NULL
+GROUP BY month
+ORDER BY month DESC;
+
+-- Documents with multiple signers
+SELECT filename, title, COUNT(*) AS signer_count
+FROM v_hand_signatures
+GROUP BY filename, title
+HAVING COUNT(*) > 1
+ORDER BY signer_count DESC;
+```
+
+### Semantic Search
+
+```sql
+-- Search for clinical protocols
 SELECT PARSE_JSON(
     SNOWFLAKE.CORTEX.SEARCH_PREVIEW(
-        'document_search',
+        'document_search_ocr_signature',
         '{
-            "query": "clinical trial protocol",
-            "columns": ["filepath", "filename", "page_index", "title", "chunk"],
+            "query": "clinical trial protocol phase 3",
+            "columns": ["filepath", "filename", "title", "chunk"],
             "limit": 10
         }'
     )
@@ -321,27 +419,13 @@ SELECT PARSE_JSON(
 -- Search with language filter
 SELECT PARSE_JSON(
     SNOWFLAKE.CORTEX.SEARCH_PREVIEW(
-        'document_search',
+        'document_search_ocr_signature',
         '{
-            "query": "manufacturing process",
+            "query": "quality control manufacturing",
             "columns": ["filepath", "filename", "title", "chunk"],
             "filter": {"@eq": {"language": "English"}},
             "limit": 10
         }'
     )
 ):results AS search_results;
-
--- Search within specific folder
-SELECT PARSE_JSON(
-    SNOWFLAKE.CORTEX.SEARCH_PREVIEW(
-        'document_search',
-        '{
-            "query": "adverse events safety",
-            "columns": ["filepath", "filename", "title", "chunk"],
-            "filter": {"@contains": {"filepath": "Clinical"}},
-            "limit": 10
-        }'
-    )
-):results AS search_results;
 ```
-
