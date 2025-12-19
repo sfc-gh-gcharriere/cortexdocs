@@ -9,7 +9,6 @@ Upload and parse PDF documents to Snowflake using AI_PARSE_DOCUMENT, extract met
 - **Handwritten Signature Extraction**: Detect and extract signer names, titles, and dates
 - **AI Summaries**: Generate concise document summaries using Claude 3.5 Sonnet
 - **Semantic Search**: Search documents by meaning, not just keywords
-- **Signature Search**: Find documents signed by specific people or on specific dates
 
 ## Prerequisites
 
@@ -35,9 +34,9 @@ This single script will:
 
 **Configuration** (edit at the top of `all_in_one_ocr.sql`):
 ```sql
-SET SF_DATABASE = 'GLD';
+SET SF_DATABASE = 'DOCS';
 SET SF_SCHEMA = 'PUBLIC';
-SET SF_STAGE = '@GLD.PUBLIC.STG';
+SET SF_STAGE = '@DOCS.PUBLIC.STG';
 SET SF_FOLDER = '%';  -- Use 'folder/%' to limit scope
 ```
 
@@ -76,7 +75,7 @@ snow sql -f 3_ai_extract.sql --database DOCS --schema PUBLIC
 ### 5. Extract Handwritten Signatures
 
 ```bash
-snow sql -f 5_ai_signatures.sql --database GLD --schema PUBLIC
+snow sql -f 5_ai_signatures.sql --database DOCS --schema PUBLIC
 ```
 
 ### 6. Create Cortex Search Service
@@ -138,76 +137,6 @@ Extracted signatures are automatically cleaned to ensure quality:
 - Entries with `None` for name or date are filtered out
 - Documents with no valid signatures have `hand_signatures` set to `NULL`
 - Title is optional (signature is kept if name and date are valid)
-
-### Signature View
-
-Query extracted signatures using the `v_hand_signatures` view:
-
-```sql
-SELECT * FROM v_hand_signatures;
-```
-
-| Column | Description |
-|--------|-------------|
-| `filepath` | Document path |
-| `filename` | Document name |
-| `title` | Document title |
-| `print_date` | Document date |
-| `signature_raw` | Raw extracted string |
-| `signer_name` | Extracted signer name |
-| `signer_title` | Extracted signer title |
-| `signature_date` | Extracted signature date |
-
-### Example Signature Queries
-
-```sql
--- Find all signatures by a specific person
-SELECT * FROM v_hand_signatures WHERE signer_name ILIKE '%Smith%';
-
--- Find documents signed in 2024
-SELECT * FROM v_hand_signatures WHERE signature_date LIKE '%2024%';
-
--- List all documents with handwritten signatures
-SELECT DISTINCT filename, title FROM v_hand_signatures;
-
--- Count signatures per document
-SELECT filename, COUNT(*) AS signature_count
-FROM v_hand_signatures
-GROUP BY filename
-ORDER BY signature_count DESC;
-```
-
----
-
-## Cortex Search with Signatures
-
-The `doc_chunks_ocr_signature` table embeds signature information directly into searchable chunks, enabling semantic search for signed documents:
-
-```sql
--- Search for documents signed by a specific person
-SELECT PARSE_JSON(
-    SNOWFLAKE.CORTEX.SEARCH_PREVIEW(
-        'document_search_ocr_signature',
-        '{
-            "query": "signed by Anna Nilsson",
-            "columns": ["filepath", "filename", "title", "chunk"],
-            "limit": 10
-        }'
-    )
-):results AS search_results;
-
--- Search for approvals or sign-offs
-SELECT PARSE_JSON(
-    SNOWFLAKE.CORTEX.SEARCH_PREVIEW(
-        'document_search_ocr_signature',
-        '{
-            "query": "approval signature medical director",
-            "columns": ["filepath", "filename", "title", "chunk"],
-            "limit": 10
-        }'
-    )
-):results AS search_results;
-```
 
 ---
 
@@ -313,19 +242,6 @@ AI_COMPLETE(
 | `chunk` | VARCHAR | Searchable chunk with embedded signatures |
 | `chunk_index` | INT | Chunk index within page |
 
-### v_hand_signatures (View)
-
-| Column | Type | Description |
-|--------|------|-------------|
-| `filepath` | VARCHAR | Document path |
-| `filename` | VARCHAR | Document name |
-| `title` | VARCHAR | Document title |
-| `print_date` | VARCHAR | Document date |
-| `signature_raw` | VARCHAR | Raw signature string |
-| `signer_name` | VARCHAR | Extracted signer name |
-| `signer_title` | VARCHAR | Extracted signer title |
-| `signature_date` | VARCHAR | Extracted signature date |
-
 ---
 
 ## Snowflake Intelligence Agent
@@ -340,10 +256,7 @@ Create an AI-powered conversational agent that uses your Cortex Search service t
 3. Add your Cortex Search service as a tool:
    - Select `document_search_ocr_signature` service
    - Configure which columns to return
-4. Test with questions like:
-   - "Who signed the clinical trial protocol?"
-   - "Find documents approved by the medical director"
-   - "What documents were signed in December 2024?"
+4. Test with questions about your documents
 
 ![Snowflake Intelligence Agent](img/si.png)
 
@@ -372,33 +285,6 @@ FROM parsed_document_ocr
 WHERE page_index = 0
 GROUP BY language
 ORDER BY document_count DESC;
-```
-
-### Signature Analytics
-
-```sql
--- Top signers across all documents
-SELECT signer_name, COUNT(*) AS signature_count
-FROM v_hand_signatures
-GROUP BY signer_name
-ORDER BY signature_count DESC
-LIMIT 20;
-
--- Signatures by month
-SELECT 
-    LEFT(signature_date, 7) AS month,
-    COUNT(*) AS signatures
-FROM v_hand_signatures
-WHERE signature_date IS NOT NULL
-GROUP BY month
-ORDER BY month DESC;
-
--- Documents with multiple signers
-SELECT filename, title, COUNT(*) AS signer_count
-FROM v_hand_signatures
-GROUP BY filename, title
-HAVING COUNT(*) > 1
-ORDER BY signer_count DESC;
 ```
 
 ### Semantic Search

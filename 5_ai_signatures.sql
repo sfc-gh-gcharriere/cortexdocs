@@ -9,9 +9,9 @@
 -- =============================================================================
 
 -- Configuration
-SET SF_DATABASE = 'GLD';
+SET SF_DATABASE = 'DOCS';
 SET SF_SCHEMA = 'PUBLIC';
-SET SF_STAGE = '@GLD.PUBLIC.STG';
+SET SF_STAGE = '@DOCS.PUBLIC.STG';
 
 -- Folder filter: set to specific file or folder, or '%' for all
 SET SF_FOLDER = '%';

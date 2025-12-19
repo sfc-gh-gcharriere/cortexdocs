@@ -19,9 +19,9 @@
 -- =============================================================================
 
 -- Configuration
-SET SF_DATABASE = 'GLD';
+SET SF_DATABASE = 'DOCS';
 SET SF_SCHEMA = 'PUBLIC';
-SET SF_STAGE = '@GLD.PUBLIC.STG';
+SET SF_STAGE = '@DOCS.PUBLIC.STG';
 SET SF_WAREHOUSE = 'COMPUTE_WH';
 
 -- Folder filter: set to folder path to process specific folder, or '%' for all documents
